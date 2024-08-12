@@ -16,14 +16,16 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
         process.exit(1); // Exit the process if the database connection fails
     });
 
-// Use routes
-app.use('/api/users', userRoutes); // Adjust path as needed
 
 // Home route
 app.get('/', (req, res) => {
     res.send('Hello GTD System!');
 });
 
+// User routes
+app.use('/api/users', userRoutes);
+
+// Error handling
 // Handle 404 for undefined routes
 app.use((req, res, next) => {
     res.status(404).send('Route not found');
