@@ -5,7 +5,7 @@ const express = require('express');
 const app = express();
 
 app.get('/', (req, res) => {
-    res.send('A Node App is running on this server')
+    res.send('A Node App is running on this server!')
     res.end()
 });
 
