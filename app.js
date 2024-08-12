@@ -7,7 +7,7 @@ const app = express();
 app.get('/', (req, res) => {
     res.send('A simple Node App is running on this server')
     res.end()
-})
+});
 
 // Port Number
 const PORT = process.env.PORT || 3000;
