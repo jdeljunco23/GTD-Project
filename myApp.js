@@ -1,17 +1,44 @@
-// Requiring module
+require('dotenv').config(); // Ensure environment variables are loaded at the top
 const express = require('express');
+const mongoose = require('mongoose');
+const userRoutes = require('./src/routes/userRoutes'); // Adjust path if needed
 
-// Creating express object
 const app = express();
 
+// Middleware
+app.use(express.json()); // For parsing application/json
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => {
+        console.error('MongoDB connection error:', err);
+        process.exit(1); // Exit the process if the database connection fails
+    });
+
+// Use routes
+app.use('/api/users', userRoutes); // Adjust path as needed
+
+// Home route
 app.get('/', (req, res) => {
-    res.send('A Node App is running on this server!')
-    res.end()
+    res.send('Hello GTD System!');
+});
+
+// Handle 404 for undefined routes
+app.use((req, res, next) => {
+    res.status(404).send('Route not found');
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something went wrong');
 });
 
 // Port Number
 const PORT = process.env.PORT || 3000;
 
 // Server Setup
-app.listen(PORT, console.log(
-    `Server started on port ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`Server started on port ${PORT}`);
+});
