@@ -1,7 +1,9 @@
 require('dotenv').config(); // Ensure environment variables are loaded at the top
 const express = require('express');
 const mongoose = require('mongoose');
-const userRoutes = require('./src/routes/userRoutes'); // Adjust path if needed
+
+const userRoutes = require('./src/routes/userRoutes');
+const taskRoutes = require('./src/routes/taskRoutes');
 
 const app = express();
 
@@ -24,6 +26,9 @@ app.get('/', (req, res) => {
 
 // User routes
 app.use('/api/users', userRoutes);
+
+// Tasks routes
+app.use('/api/tasks', taskRoutes);
 
 // Error handling
 // Handle 404 for undefined routes

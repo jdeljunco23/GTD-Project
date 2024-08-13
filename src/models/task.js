@@ -17,10 +17,11 @@ const TaskSchema = new Schema({
     },
     project: {
         type: Schema.Types.ObjectId,
-        ref: 'Project'
+        ref: 'Project',
+        default: null
     }
 });
 
-const Task = model('Task', TaskSchema);
+const Task = mongoose.model('Task', TaskSchema);
 
 module.exports = Task;
