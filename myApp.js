@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 
 const userRoutes = require('./src/routes/userRoutes');
 const taskRoutes = require('./src/routes/taskRoutes');
+const projectRoutes = require('./src/routes/projectRoutes');
 
 const app = express();
 
@@ -29,6 +30,9 @@ app.use('/api/users', userRoutes);
 
 // Tasks routes
 app.use('/api/tasks', taskRoutes);
+
+// Project routes
+app.use('/api/projects', projectRoutes);
 
 // Error handling
 // Handle 404 for undefined routes
