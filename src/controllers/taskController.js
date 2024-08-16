@@ -73,34 +73,50 @@ const updateTask = async (req, res) => {
         const { title, description, completed, project } = req.body;
         const taskId = req.params.id;
 
-        const task = await Task.findByIdAndUpdate(taskId, { title, description, completed, project }, { new: true });
-
-        if (!task) {
+        // Fetch the existing task to get its current project
+        const existingTask = await Task.findById(taskId);
+        if (!existingTask) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        if (project) {
-            const projectObj = await Project.findById(project);
+        // Update the task with new details
+        const updatedTask = await Task.findByIdAndUpdate(
+            taskId,
+            { title, description, completed, project },
+            { new: true }
+        );
 
-            if (projectObj) {
-                if (task.project) {
-                    const oldProject = await Project.findById(task.project);
-                    if (oldProject) {
-                        oldProject.tasks.pull(taskId);
-                        await oldProject.save();
-                    }
-                }
+        if (!updatedTask) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
 
-                projectObj.tasks.push(taskId);
-                await projectObj.save();
+        // Handle project updates
+        if (existingTask.project && existingTask.project.toString() !== project) {
+            // Remove the task from the old project's tasks array
+            const oldProject = await Project.findById(existingTask.project);
+            if (oldProject) {
+                oldProject.tasks.pull(taskId);
+                await oldProject.save();
             }
         }
 
-        res.status(200).json(task);
+        if (project) {
+            // Add the task to the new project's tasks array if it's not already there
+            const newProject = await Project.findById(project);
+            if (newProject) {
+                if (!newProject.tasks.includes(taskId)) {
+                    newProject.tasks.push(taskId);
+                    await newProject.save();
+                }
+            }
+        }
+
+        res.status(202).json(updatedTask);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
 }
+
 
 
 const deleteTask = async (req, res) => {
