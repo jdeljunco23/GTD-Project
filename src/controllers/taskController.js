@@ -70,18 +70,38 @@ const getAllTasks = async (req, res) => {
 
 const updateTask = async (req, res) => {
     try {
-        const { title, description, completed } = req.body;
-        const task = await Task.findByIdAndUpdate(req.params.id, { title, description, completed }, { new: true });
+        const { title, description, completed, project } = req.body;
+        const taskId = req.params.id;
+
+        const task = await Task.findByIdAndUpdate(taskId, { title, description, completed, project }, { new: true });
 
         if (!task) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        res.status(202).json(task);
+        if (project) {
+            const projectObj = await Project.findById(project);
+
+            if (projectObj) {
+                if (task.project) {
+                    const oldProject = await Project.findById(task.project);
+                    if (oldProject) {
+                        oldProject.tasks.pull(taskId);
+                        await oldProject.save();
+                    }
+                }
+
+                projectObj.tasks.push(taskId);
+                await projectObj.save();
+            }
+        }
+
+        res.status(200).json(task);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
 }
+
 
 const deleteTask = async (req, res) => {
     try {
@@ -92,17 +112,15 @@ const deleteTask = async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        // If the task belongs to a project, remove the task from the project's tasks array
         if (task.project) {
             const project = await Project.findById(task.project);
 
             if (project) {
                 project.tasks.pull(taskId);
-                await project.save();  // Save the project with the updated tasks array
+                await project.save();
             }
         }
 
-        // Directly delete the task
         await Task.findByIdAndDelete(taskId);
 
         res.status(200).json({ message: 'Task deleted successfully' });
