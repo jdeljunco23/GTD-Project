@@ -64,17 +64,47 @@ const updateProject = async (req, res) => {
         const { name, description, tasks } = req.body;
         const projectId = req.params.id;
 
-        const project = await Project.findByIdAndUpdate(projectId, { name, description, tasks }, { new: true });
-
+        // Find the existing project
+        const project = await Project.findById(projectId);
         if (!project) {
             return res.status(404).json('Project not found');
         }
 
-        res.status(200).json(project);
+        // Update the project's name and description if provided
+        project.name = name || project.name;
+        project.description = description || project.description;
+
+        // Handle task association and disassociation
+        if (tasks && tasks.length > 0) {
+            // Find tasks that are currently associated with this project but are not in the new tasks array
+            const removedTasks = project.tasks.filter(taskId => !tasks.includes(taskId.toString()));
+
+            // Disassociate these removed tasks from the project
+            await Task.updateMany({ _id: { $in: removedTasks } }, { $set: { project: null } });
+
+            // Associate the new tasks with the project
+            await Task.updateMany({ _id: { $in: tasks } }, { $set: { project: project._id } });
+
+            // Update the tasks array in the project
+            project.tasks = tasks;
+        } else {
+            // If no tasks are provided, disassociate all current tasks
+            await Task.updateMany({ _id: { $in: project.tasks } }, { $set: { project: null } });
+            project.tasks = [];
+        }
+
+        // Save the updated project
+        await project.save();
+
+        // Reload the project from the database to ensure consistency
+        const updatedProject = await Project.findById(projectId).populate('tasks');
+
+        res.status(200).json(updatedProject);
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
-}
+};
+
 
 const deleteProject = async (req, res) => {
     try {
