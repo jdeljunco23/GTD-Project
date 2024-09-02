@@ -3,7 +3,7 @@ const Project = require('../models/project');
 
 const createTask = async (req, res) => {
     try {
-        const { title, description, completed, project: projectId } = req.body;
+        const { title, description, completed, project: projectId, frequency } = req.body;
 
         if (!title || !description) {
             return res.status(400).json({ error: 'Title and description are required.' });
@@ -13,7 +13,8 @@ const createTask = async (req, res) => {
             title,
             description,
             completed,
-            project: projectId || null
+            project: projectId || null,
+            frequency: frequency || null
         });
 
         await newTask.save();
@@ -70,29 +71,26 @@ const getAllTasks = async (req, res) => {
 
 const updateTask = async (req, res) => {
     try {
-        const { title, description, completed, project } = req.body;
+        const { title, description, completed, project, frequency } = req.body;
         const taskId = req.params.id;
 
-        // Fetch the existing task to get its current project
         const existingTask = await Task.findById(taskId);
         if (!existingTask) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        // Update the task with new details
         const updatedTask = await Task.findByIdAndUpdate(
             taskId,
-            { title, description, completed, project },
-            { new: true }
+            { title, description, completed, project, frequency },
+            { new: true, runValidators: true }
         );
 
         if (!updatedTask) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        // Handle project updates
         if (existingTask.project && existingTask.project.toString() !== project) {
-            // Remove the task from the old project's tasks array
+
             const oldProject = await Project.findById(existingTask.project);
             if (oldProject) {
                 oldProject.tasks.pull(taskId);
@@ -101,7 +99,7 @@ const updateTask = async (req, res) => {
         }
 
         if (project) {
-            // Add the task to the new project's tasks array if it's not already there
+
             const newProject = await Project.findById(project);
             if (newProject) {
                 if (!newProject.tasks.includes(taskId)) {

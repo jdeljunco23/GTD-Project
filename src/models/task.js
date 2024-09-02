@@ -19,6 +19,11 @@ const TaskSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Project',
         default: null
+    },
+    frequency: {
+        type: String,
+        enum: ['Daily', 'Weekly', 'Monthly', 'Yearly'],
+        default: null
     }
 });
 
