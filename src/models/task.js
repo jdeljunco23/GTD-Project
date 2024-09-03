@@ -27,7 +27,7 @@ const TaskSchema = new Schema({
     },
     status: {
         type: String,
-        enum: ['Main inbox', 'Waiting For', 'Scheduled', 'Someday/Maybe'],
+        enum: ['Main Inbox', 'Waiting For', 'Scheduled', 'Someday/Maybe'],
         default: 'Main inbox'
     },
     areaOfResponsibility: {

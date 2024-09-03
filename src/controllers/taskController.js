@@ -3,7 +3,7 @@ const Project = require('../models/project');
 
 const createTask = async (req, res) => {
     try {
-        const { title, description, completed, project: projectId, frequency } = req.body;
+        const { title, description, completed, project: projectId, frequency, status, areaOfResponsibility, dueDate, priority } = req.body;
 
         if (!title || !description) {
             return res.status(400).json({ error: 'Title and description are required.' });
@@ -14,7 +14,11 @@ const createTask = async (req, res) => {
             description,
             completed,
             project: projectId || null,
-            frequency: frequency || null
+            frequency: frequency || null,
+            status: status || 'Main Inbox',
+            areaOfResponsibility: areaOfResponsibility || null,
+            dueDate: dueDate || null,
+            priority: priority
         });
 
         await newTask.save();
@@ -25,6 +29,14 @@ const createTask = async (req, res) => {
             if (!project) {
                 return res.status(404).json({ error: 'Project not found' });
             }
+
+            // Validate that task dueDate is before or equal to project dueDate
+            if (dueDate && new Date(dueDate) > new Date(project.dueDate)) {
+                return res.status(400).json({ error: 'Task due date cannot be later than project due date.' });
+            }
+
+            // If the task is in a project, the task's area of responsibility will be the same as the project's
+            newTask.areaOfResponsibility = project.areaOfResponsibility;
 
             if (!Array.isArray(project.tasks)) {
                 project.tasks = [];
@@ -39,6 +51,7 @@ const createTask = async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 };
+
 
 const getTaskById = async (req, res) => {
     try {
@@ -71,7 +84,7 @@ const getAllTasks = async (req, res) => {
 
 const updateTask = async (req, res) => {
     try {
-        const { title, description, completed, project, frequency } = req.body;
+        const { title, description, completed, project, frequency, status, areaOfResponsibility, dueDate, priority } = req.body;
         const taskId = req.params.id;
 
         const existingTask = await Task.findById(taskId);
@@ -79,9 +92,35 @@ const updateTask = async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
 
+        let updatedAreaOfResponsibility = areaOfResponsibility || existingTask.areaOfResponsibility;
+
+        if (project && project !== existingTask.project.toString()) {
+            const newProject = await Project.findById(project);
+            if (!newProject) {
+                return res.status(404).json({ error: 'New project not found' });
+            }
+
+            // Validate that task dueDate is before or equal to new project's dueDate
+            if (dueDate && new Date(dueDate) > new Date(newProject.dueDate)) {
+                return res.status(400).json({ error: 'Task due date cannot be later than project due date.' });
+            }
+
+            updatedAreaOfResponsibility = newProject.areaOfResponsibility;
+        }
+
         const updatedTask = await Task.findByIdAndUpdate(
             taskId,
-            { title, description, completed, project, frequency },
+            {
+                title,
+                description,
+                completed,
+                project,
+                frequency,
+                status,
+                areaOfResponsibility: updatedAreaOfResponsibility,
+                dueDate,
+                priority
+            },
             { new: true, runValidators: true }
         );
 
@@ -90,19 +129,15 @@ const updateTask = async (req, res) => {
         }
 
         if (existingTask.project && existingTask.project.toString() !== project) {
-
             const oldProject = await Project.findById(existingTask.project);
             if (oldProject) {
                 oldProject.tasks.pull(taskId);
                 await oldProject.save();
             }
-        }
 
-        if (project) {
-
-            const newProject = await Project.findById(project);
-            if (newProject) {
-                if (!newProject.tasks.includes(taskId)) {
+            if (project) {
+                const newProject = await Project.findById(project);
+                if (newProject && !newProject.tasks.includes(taskId)) {
                     newProject.tasks.push(taskId);
                     await newProject.save();
                 }
@@ -113,7 +148,7 @@ const updateTask = async (req, res) => {
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
-}
+};
 
 
 
