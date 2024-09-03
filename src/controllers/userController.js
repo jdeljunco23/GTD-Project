@@ -7,17 +7,19 @@ const SECRET_KEY = process.env.SECRET_KEY;
 
 const createUser = async (req, res) => {
     try {
-        console.log('Received request to create user:', req.body);
 
         let { username, email, password } = req.body;
 
-        // Validate input
         if (!username || !email || !password) {
             console.log('Validation failed: Missing fields');
             return res.status(400).json({ message: 'All fields are required' });
         }
 
-        // Hash the password
+        const existingUsername = await User.findOne({ username });
+        if (existingUsername) {
+            return res.status(409).json({ message: 'Username already taken' })
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         console.log('Password hashed:', hashedPassword);
 
@@ -65,8 +67,65 @@ const getUserById = async (req, res) => {
     }
 }
 
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find().populate('projects').populate('tasks');
+        res.status(201).json(users);
+    } catch (err) {
+        res.status(500).json({ error: 'Server error. Please try again later.' })
+    }
+};
+
+const updateUser = async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        const userId = req.params.id;
+
+        if (username) {
+            const existingUser = await User.findOne({ username });
+
+            if (existingUser && existingUser._id.toString() !== userId) {
+                return res.status(409).json({ error: 'Username already taken.' })
+            }
+        }
+
+        let updateData = { username, email };
+        if (password) {
+            updateData.password = await bcrypt.hash(password, 10);
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true });
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        res.status(200).json({ message: 'User updated', user: updatedUser });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error. Please try again later.' });
+    }
+}
+
+const deleteUser = async (req, res) => {
+    try {
+        const userId = req.params.id;
+
+        const deletedUser = await User.findByIdAndDelete(userId);
+        if (!deletedUser) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        res.status(200).json({ message: 'User deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: 'Server error. Please try again later.' });
+    }
+};
+
 module.exports = {
     createUser,
     loginUser,
-    getUserById
+    getUserById,
+    getAllUsers,
+    updateUser,
+    deleteUser
 };
