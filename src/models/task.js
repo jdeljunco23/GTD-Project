@@ -24,6 +24,22 @@ const TaskSchema = new Schema({
         type: String,
         enum: ['Daily', 'Weekly', 'Monthly', 'Yearly'],
         default: null
+    },
+    status: {
+        type: String,
+        enum: ['Main inbox', 'Waiting For', 'Scheduled', 'Someday/Maybe'],
+        default: 'Main inbox'
+    },
+    areaOfResponsibility: {
+        type: String
+    },
+    dueDate: {
+        type: Date
+    },
+    priority: {
+        type: Number,
+        enum: [1, 2, 3, 4, 5], //Highest=1, Lowest=5
+        required: true
     }
 });
 
