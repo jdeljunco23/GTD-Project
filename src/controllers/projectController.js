@@ -1,9 +1,11 @@
 const Project = require('../models/project');
 const Task = require('../models/task');
+const authMiddleware = require('../middleware/authMiddleware');
 
 const createProject = async (req, res) => {
     try {
-        const { name, description, tasks } = req.body;
+        const userId = req.user._id;
+        const { name, description, tasks, status, areaOfResponsibility, dueDate } = req.body;
 
         if (!name) {
             return res.status(400).json({ error: 'Name is required' });
@@ -12,7 +14,11 @@ const createProject = async (req, res) => {
         const newProject = new Project({
             name,
             description,
-            tasks: tasks || null
+            tasks: tasks || null,
+            status: status || 'Main Inbox',
+            areaOfResponsibility: areaOfResponsibility || null,
+            dueDate: dueDate || null,
+            user: userId
         });
 
 
@@ -47,7 +53,8 @@ const getProjectById = async (req, res) => {
 
 const getAllProjects = async (req, res) => {
     try {
-        const projects = await Project.find();
+        const userId = req.user._id;
+        const projects = await Project.find({ user: userId });
 
         if (!projects.size == 0) {
             return res.status(404).json({ error: 'There are no projects' });
@@ -61,8 +68,9 @@ const getAllProjects = async (req, res) => {
 
 const updateProject = async (req, res) => {
     try {
-        const { name, description, tasks } = req.body;
+        const { name, description, tasks, status, areaOfResponsibility, dueDate } = req.body;
         const projectId = req.params.id;
+        const userId = req.user._id;
 
         // Find the existing project
         const project = await Project.findById(projectId);
@@ -70,9 +78,16 @@ const updateProject = async (req, res) => {
             return res.status(404).json('Project not found');
         }
 
+        if (project.user.toString() !== userId.toString()) {
+            return res.status(404).json('Project not authorized');
+        }
+
         // Update the project's name and description if provided
         project.name = name || project.name;
         project.description = description || project.description;
+        project.status = status || project.status;
+        project.areaOfResponsibility = areaOfResponsibility || project.areaOfResponsibility;
+        project.dueDate = dueDate || project.dueDate;
 
         // Handle task association and disassociation
         if (tasks && tasks.length > 0) {
@@ -110,14 +125,19 @@ const deleteProject = async (req, res) => {
     try {
         const projectId = req.params.id;
 
-        const project = await Project.findByIdAndDelete(projectId);
+        // Ensure the project belongs to the user (optional)
+        const project = await Project.findById(projectId);
+        if (!project || project.user.toString() !== req.user._id.toString()) {
+            return res.status(404).json('Project not found or not authorized');
+        }
 
-        if (!project) {
+        const deletedProject = await Project.findByIdAndDelete(projectId);
+
+        if (!deletedProject) {
             return res.status(404).json('Project not found');
         }
 
-        if (project.tasks) {
-
+        if (deletedProject.tasks) {
             await Task.updateMany({ project: projectId }, { $set: { project: null } })
         }
 

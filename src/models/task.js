@@ -40,6 +40,11 @@ const TaskSchema = new Schema({
         type: Number,
         enum: [1, 2, 3, 4, 5], //Highest=1, Lowest=5
         required: true
+    },
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
     }
 });
 

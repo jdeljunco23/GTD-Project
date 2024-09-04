@@ -2,15 +2,17 @@ require('dotenv').config();
 const express = require('express');
 const router = express.Router();
 const projectController = require('../controllers/projectController');
+const authMiddleware = require('../middleware/authMiddleware');
 
-router.post('/', projectController.createProject);
 
-router.get('/:id', projectController.getProjectById);
+router.post('/', authMiddleware, projectController.createProject);
 
-router.get('/', projectController.getAllProjects);
+router.get('/:id', authMiddleware, projectController.getProjectById);
 
-router.put('/:id', projectController.updateProject);
+router.get('/', authMiddleware, projectController.getAllProjects);
 
-router.delete('/:id', projectController.deleteProject);
+router.put('/:id', authMiddleware, projectController.updateProject);
+
+router.delete('/:id', authMiddleware, projectController.deleteProject);
 
 module.exports = router;

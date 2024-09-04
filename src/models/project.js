@@ -17,14 +17,19 @@ const ProjectSchema = new Schema({
     }],
     status: {
         type: String,
-        enum: ['Main inbox', 'Waiting For', 'Scheduled', 'Someday/Maybe'],
-        default: 'Main inbox'
+        enum: ['Main Inbox', 'Waiting For', 'Scheduled', 'Someday/Maybe'],
+        default: 'Main Inbox'
     },
     areaOfResponsibility: {
         type: String
     },
     dueDate: {
         type: Date
+    },
+    user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
     }
 });
 

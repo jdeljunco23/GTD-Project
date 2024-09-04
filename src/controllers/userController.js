@@ -11,7 +11,6 @@ const createUser = async (req, res) => {
         let { username, email, password } = req.body;
 
         if (!username || !email || !password) {
-            console.log('Validation failed: Missing fields');
             return res.status(400).json({ message: 'All fields are required' });
         }
 
@@ -20,12 +19,17 @@ const createUser = async (req, res) => {
             return res.status(409).json({ message: 'Username already taken' })
         }
 
+        const existingEmail = await User.findOne({ email });
+        if (existingEmail) {
+            return res.status(409).json({ message: 'Email already registered' });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
         console.log('Password hashed:', hashedPassword);
 
         let newUser = new User({ username, email, password: hashedPassword });
         await newUser.save();
-        console.log('User created:', newUser);
+
         res.status(201).json({ message: 'User created', user: newUser });
     } catch (err) {
         console.error('Error creating user:', err);
@@ -37,12 +41,15 @@ const createUser = async (req, res) => {
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
+
         const user = await User.findOne({ email });
+
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
+
         if (!isMatch) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -50,9 +57,11 @@ const loginUser = async (req, res) => {
         const token = jwt.sign({ id: user._id, email: user.email }, SECRET_KEY, { expiresIn: '30d' });
         res.json({ token });
     } catch (err) {
+        console.error('Error during login:', err);
         res.status(400).json({ error: err.message });
     }
 };
+
 
 const getUserById = async (req, res) => {
 
