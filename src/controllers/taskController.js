@@ -99,54 +99,46 @@ const updateTask = async (req, res) => {
         const { title, description, completed, project: projectId, frequency, status, areaOfResponsibility, dueDate, priority } = req.body;
         const taskId = req.params.id;
 
-        // Find the existing task
         const existingTask = await Task.findOne({ _id: taskId, user: userId });
         if (!existingTask) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        // Check for title uniqueness
         const existingTaskName = await Task.findOne({ title });
         if (existingTaskName && existingTaskName._id.toString() !== taskId) {
             return res.status(409).json({ message: 'This title is already taken' });
         }
 
-        // Default values
         let updatedAreaOfResponsibility = areaOfResponsibility !== undefined ? areaOfResponsibility : existingTask.areaOfResponsibility;
         let updatedStatus = status !== undefined ? status : existingTask.status;
 
-        // Handle project updates
         if (projectId && (!existingTask.project || existingTask.project.toString() !== projectId)) {
             const newProject = await Project.findById(projectId);
             if (!newProject) {
                 return res.status(404).json({ error: 'New project not found' });
             }
 
-            // Validate dueDate
             if (dueDate && new Date(dueDate) > new Date(newProject.dueDate)) {
                 return res.status(400).json({ error: 'Task due date cannot be later than project due date.' });
             }
 
-            // Update based on new project
             updatedAreaOfResponsibility = newProject.areaOfResponsibility;
             updatedStatus = newProject.status;
         } else if (!projectId && existingTask.project) {
-            // If no project ID is provided and the task was previously associated with a project
             updatedStatus = 'Main Inbox';
             updatedAreaOfResponsibility = null;
         }
 
-        // Update the task
         const updatedTask = await Task.findByIdAndUpdate(
             taskId,
             {
                 title,
                 description,
                 completed,
-                project: projectId || null, // Set to null if projectId is not provided
+                project: projectId || null, 
                 frequency,
-                status: updatedStatus, // Use updatedStatus here
-                areaOfResponsibility: updatedAreaOfResponsibility, // Use updatedAreaOfResponsibility here
+                status: updatedStatus, 
+                areaOfResponsibility: updatedAreaOfResponsibility, 
                 dueDate,
                 priority,
                 user: userId
@@ -158,7 +150,6 @@ const updateTask = async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        // Handle old project disassociation
         if (existingTask.project && existingTask.project.toString() !== projectId) {
             const oldProject = await Project.findById(existingTask.project);
             if (oldProject) {
@@ -167,7 +158,6 @@ const updateTask = async (req, res) => {
             }
         }
 
-        // Handle new project association
         if (projectId) {
             const newProject = await Project.findById(projectId);
             if (newProject && !newProject.tasks.includes(taskId)) {
