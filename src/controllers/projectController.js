@@ -72,7 +72,6 @@ const updateProject = async (req, res) => {
         const projectId = req.params.id;
         const userId = req.user._id;
 
-        // Find the existing project
         const project = await Project.findById(projectId);
         if (!project) {
             return res.status(404).json('Project not found');
@@ -82,36 +81,41 @@ const updateProject = async (req, res) => {
             return res.status(404).json('Project not authorized');
         }
 
-        // Update the project's name and description if provided
         project.name = name || project.name;
         project.description = description || project.description;
         project.status = status || project.status;
         project.areaOfResponsibility = areaOfResponsibility || project.areaOfResponsibility;
         project.dueDate = dueDate || project.dueDate;
 
-        // Handle task association and disassociation
         if (tasks && tasks.length > 0) {
-            // Find tasks that are currently associated with this project but are not in the new tasks array
+
             const removedTasks = project.tasks.filter(taskId => !tasks.includes(taskId.toString()));
 
-            // Disassociate these removed tasks from the project
-            await Task.updateMany({ _id: { $in: removedTasks } }, { $set: { project: null } });
+            if (removedTasks.length > 0) {
+                await Task.updateMany(
+                    { _id: { $in: removedTasks } },
+                    { $set: { project: null, status: 'Main Inbox', areaOfResponsibility: null } }
+                );
+            }
 
-            // Associate the new tasks with the project
-            await Task.updateMany({ _id: { $in: tasks } }, { $set: { project: project._id } });
+            await Task.updateMany(
+                { _id: { $in: tasks } },
+                { $set: { project: project._id, status: project.status, areaOfResponsibility: project.areaOfResponsibility } }
+            );
 
-            // Update the tasks array in the project
             project.tasks = tasks;
         } else {
-            // If no tasks are provided, disassociate all current tasks
-            await Task.updateMany({ _id: { $in: project.tasks } }, { $set: { project: null } });
+            if (project.tasks.length > 0) {
+                await Task.updateMany(
+                    { _id: { $in: project.tasks } },
+                    { $set: { project: null, status: 'Main Inbox', areaOfResponsibility: null } }
+                );
+            }
             project.tasks = [];
         }
 
-        // Save the updated project
         await project.save();
 
-        // Reload the project from the database to ensure consistency
         const updatedProject = await Project.findById(projectId).populate('tasks');
 
         res.status(200).json(updatedProject);
@@ -125,7 +129,6 @@ const deleteProject = async (req, res) => {
     try {
         const projectId = req.params.id;
 
-        // Ensure the project belongs to the user (optional)
         const project = await Project.findById(projectId);
         if (!project || project.user.toString() !== req.user._id.toString()) {
             return res.status(404).json('Project not found or not authorized');

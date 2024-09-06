@@ -5,23 +5,16 @@ const createTask = async (req, res) => {
     try {
         const { title, description, completed, project: projectId, frequency, status, areaOfResponsibility, dueDate, priority } = req.body;
 
+        const userId = req.user._id;
+
         if (!title || !description) {
             return res.status(400).json({ error: 'Title and description are required.' });
         }
 
-        const newTask = new Task({
-            title,
-            description,
-            completed,
-            project: projectId || null,
-            frequency: frequency || null,
-            status: status || 'Main Inbox',
-            areaOfResponsibility: areaOfResponsibility || null,
-            dueDate: dueDate || null,
-            priority: priority
-        });
-
-        await newTask.save();
+        const existingTaskName = await Task.findOne({ title });
+        if (existingTaskName) {
+            return res.status(409).json({ message: 'This title is already taken' });
+        }
 
         if (projectId) {
             const project = await Project.findById(projectId);
@@ -35,8 +28,9 @@ const createTask = async (req, res) => {
                 return res.status(400).json({ error: 'Task due date cannot be later than project due date.' });
             }
 
-            // If the task is in a project, the task's area of responsibility will be the same as the project's
+            // If the task is in a project, the task's area of responsibility and status will be the same as the project's
             newTask.areaOfResponsibility = project.areaOfResponsibility;
+            newTask.status = project.status;
 
             if (!Array.isArray(project.tasks)) {
                 project.tasks = [];
@@ -45,6 +39,21 @@ const createTask = async (req, res) => {
             project.tasks.push(newTask._id);
             await project.save();
         }
+
+        const newTask = new Task({
+            title,
+            description,
+            completed,
+            project: projectId || null,
+            frequency: frequency || null,
+            status: status || 'Main Inbox',
+            areaOfResponsibility: areaOfResponsibility || null,
+            dueDate: dueDate || null,
+            priority: priority,
+            user: userId
+        });
+
+        await newTask.save();
 
         res.status(201).json({ message: 'Task created', newTask });
     } catch (err) {
@@ -55,7 +64,8 @@ const createTask = async (req, res) => {
 
 const getTaskById = async (req, res) => {
     try {
-        const task = await Task.findById(req.params.id);
+        const userId = req.user._id;
+        const task = await Task.findOne({ _id: req.params.id, user: userId });
 
         if (!task) {
             return res.status(404).json({ error: 'Task not found' });
@@ -70,7 +80,8 @@ const getTaskById = async (req, res) => {
 
 const getAllTasks = async (req, res) => {
     try {
-        const tasks = await Task.find();
+        const userId = req.user._id;
+        const tasks = await Task.find({ user: userId });
 
         if (tasks.size == 0) {
             return res.status(404).json({ error: 'There are no tasks' });
@@ -84,42 +95,61 @@ const getAllTasks = async (req, res) => {
 
 const updateTask = async (req, res) => {
     try {
-        const { title, description, completed, project, frequency, status, areaOfResponsibility, dueDate, priority } = req.body;
+        const userId = req.user._id;
+        const { title, description, completed, project: projectId, frequency, status, areaOfResponsibility, dueDate, priority } = req.body;
         const taskId = req.params.id;
 
-        const existingTask = await Task.findById(taskId);
+        // Find the existing task
+        const existingTask = await Task.findOne({ _id: taskId, user: userId });
         if (!existingTask) {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        let updatedAreaOfResponsibility = areaOfResponsibility || existingTask.areaOfResponsibility;
+        // Check for title uniqueness
+        const existingTaskName = await Task.findOne({ title });
+        if (existingTaskName && existingTaskName._id.toString() !== taskId) {
+            return res.status(409).json({ message: 'This title is already taken' });
+        }
 
-        if (project && project !== existingTask.project.toString()) {
-            const newProject = await Project.findById(project);
+        // Default values
+        let updatedAreaOfResponsibility = areaOfResponsibility !== undefined ? areaOfResponsibility : existingTask.areaOfResponsibility;
+        let updatedStatus = status !== undefined ? status : existingTask.status;
+
+        // Handle project updates
+        if (projectId && (!existingTask.project || existingTask.project.toString() !== projectId)) {
+            const newProject = await Project.findById(projectId);
             if (!newProject) {
                 return res.status(404).json({ error: 'New project not found' });
             }
 
-            // Validate that task dueDate is before or equal to new project's dueDate
+            // Validate dueDate
             if (dueDate && new Date(dueDate) > new Date(newProject.dueDate)) {
                 return res.status(400).json({ error: 'Task due date cannot be later than project due date.' });
             }
 
+            // Update based on new project
             updatedAreaOfResponsibility = newProject.areaOfResponsibility;
+            updatedStatus = newProject.status;
+        } else if (!projectId && existingTask.project) {
+            // If no project ID is provided and the task was previously associated with a project
+            updatedStatus = 'Main Inbox';
+            updatedAreaOfResponsibility = null;
         }
 
+        // Update the task
         const updatedTask = await Task.findByIdAndUpdate(
             taskId,
             {
                 title,
                 description,
                 completed,
-                project,
+                project: projectId || null, // Set to null if projectId is not provided
                 frequency,
-                status,
-                areaOfResponsibility: updatedAreaOfResponsibility,
+                status: updatedStatus, // Use updatedStatus here
+                areaOfResponsibility: updatedAreaOfResponsibility, // Use updatedAreaOfResponsibility here
                 dueDate,
-                priority
+                priority,
+                user: userId
             },
             { new: true, runValidators: true }
         );
@@ -128,19 +158,21 @@ const updateTask = async (req, res) => {
             return res.status(404).json({ error: 'Task not found' });
         }
 
-        if (existingTask.project && existingTask.project.toString() !== project) {
+        // Handle old project disassociation
+        if (existingTask.project && existingTask.project.toString() !== projectId) {
             const oldProject = await Project.findById(existingTask.project);
             if (oldProject) {
                 oldProject.tasks.pull(taskId);
                 await oldProject.save();
             }
+        }
 
-            if (project) {
-                const newProject = await Project.findById(project);
-                if (newProject && !newProject.tasks.includes(taskId)) {
-                    newProject.tasks.push(taskId);
-                    await newProject.save();
-                }
+        // Handle new project association
+        if (projectId) {
+            const newProject = await Project.findById(projectId);
+            if (newProject && !newProject.tasks.includes(taskId)) {
+                newProject.tasks.push(taskId);
+                await newProject.save();
             }
         }
 
@@ -151,11 +183,11 @@ const updateTask = async (req, res) => {
 };
 
 
-
 const deleteTask = async (req, res) => {
     try {
+        const userId = req.user._id;
         const taskId = req.params.id;
-        const task = await Task.findById(taskId);
+        const task = await Task.findOne({ _id: taskId, user: userId });
 
         if (!task) {
             return res.status(404).json({ error: 'Task not found' });
@@ -177,8 +209,6 @@ const deleteTask = async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 }
-
-
 
 module.exports = {
     createTask,
